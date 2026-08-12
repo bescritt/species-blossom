@@ -1,0 +1,5 @@
+#!/bin/bash
+for file in $( find . | grep .red\$ )
+do
+	pmars_server -r 0 $file > ${file%.red}.rc
+done

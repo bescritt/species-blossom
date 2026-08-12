@@ -1,0 +1,7 @@
+#!/bin/bash
+
+find ../../warriors | grep rc\$ | zip -9 -@ blossom-$( date +%Y%m%d ).zip
+make clean
+find . | zip -9 -@ blossom-$( date +%Y%m%d ).zip
+zip -d blossom-$( date +%Y%m%d ).zip \*.zip
+
