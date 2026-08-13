@@ -111,7 +111,9 @@ coverage:
 	$(MAKE) clean
 	CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage" CPPFLAGS="-g -O0 -fprofile-arcs -ftest-coverage" LDFLAGS="-g -O0 -fprofile-arcs -ftest-coverage" make -j2 blossom${EXE_EXT}
 	# build mersenne test with coverage
-	${CPP} -g -O0 -fprofile-arcs -ftest-coverage -o test/test_mersenne_cov test/test_mersenne.cpp mersenne.o || true
+	# compile mersenne with coverage
+	${CPP} -g -O0 -fprofile-arcs -ftest-coverage -c mersenne.cpp -o mersenne_cov.o || true
+	${CPP} -g -O0 -fprofile-arcs -ftest-coverage -o test/test_mersenne_cov test/test_mersenne.cpp mersenne_cov.o || true
 	./test/test_mersenne_cov || true
 	mkdir -p $(COVERAGE_DIR)
 	gcov -o . mersenne.cpp > $(COVERAGE_DIR)/mersenne.gcov || true
