@@ -271,7 +271,17 @@ int main(int argc,char** argv) {
 		}
 	}
 
-	std::cout << "Species-Blossom version 0.1" << std::endl;
+{
+		// Print ASCII banner if available (non-fatal)
+		FILE* banner = fopen("assets/banner.txt","r");
+		if(banner) {
+			char buf[1024];
+			while(fgets(buf,sizeof(buf),banner))
+				std::cout << buf;
+			fclose(banner);
+		}
+		std::cout << "Species-Blossom version 0.1" << std::endl;
+	}
 	
 	try {
 		CWorld world;
@@ -280,7 +290,17 @@ int main(int argc,char** argv) {
 		CInsnGeneratorMarkov markov(world);
 		markov.load("test/koen.markov2");
 		//markov.dump(std::cout);
-		world.set_plotter(pl_popen());
+		if(!getenv("NO_PLOT")) {
+			plotter_t* p = pl_popen();
+			if(p) {
+				world.set_plotter(p);
+			} else {
+				std::cerr << "Warning: gnuplot pipe unavailable; running headless\n";
+				world.set_plotter(nullptr);
+			}
+		} else {
+			world.set_plotter(nullptr);
+		}
 		create_benchmark(world,"Optimax Scanners",FSH_94NOP_SCN);
 		create_benchmark(world,"Optimax Papers",FSH_94NOP_PAP);
 		create_benchmark(world,"Optimax Stones",FSH_94NOP_STN);
