@@ -54,6 +54,18 @@ OTHER = \
 
 all: blossom${EXE_EXT}
 
+TESTS = test/test_mersenne
+
+.PHONY: unit-tests
+
+unit-tests: ${TESTS}
+	@for t in $(TESTS); do \
+		printf "Running $$t... "; \
+		./$$t || exit 1; \
+	done
+
+
+
 blossom${EXE_EXT}:	${EXHAUST} ${BLOSSOM} ${OTHER}
 	${LD} ${CPPFLAGS} -o $@ ${EXHAUST} ${BLOSSOM} ${OTHER} ${LDFLAGS}
 
@@ -66,6 +78,12 @@ blossom${EXE_EXT}:	${EXHAUST} ${BLOSSOM} ${OTHER}
 	
 %.opp:	%.cpp
 	${CPP} ${CPPFLAGS} -c $< -MD -MF $(<:%.cpp=%.dep) -o $@
+
+# test binaries
+
+test/test_mersenne: test/test_mersenne.cpp mersenne.opp
+	${CPP} ${CPPFLAGS} -o $@ test/test_mersenne.cpp mersenne.opp
+
 #misc
 
 debug:	blossom${EXE_EXT}
@@ -82,3 +100,26 @@ clean:
 	rm -f Pond.dat *.dat
 	
 -include $(EXHAUST:%.o=%.dep) $(BLOSSOM:%.opp=%.dep) $(OTHER:%.o=%.dep)
+
+.PHONY: test test-integration
+
+test: unit-tests test-integration
+
+coverage: COVERAGE_DIR=coverage
+coverage:
+	@echo "Building with coverage flags..."
+	$(MAKE) clean
+	CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage" CPPFLAGS="-g -O0 -fprofile-arcs -ftest-coverage" LDFLAGS="-g -O0 -fprofile-arcs -ftest-coverage" make -j2 blossom${EXE_EXT}
+	# build mersenne test with coverage
+	$(CXX) -g -O0 -fprofile-arcs -ftest-coverage -o test/test_mersenne_cov test/test_mersenne.cpp mersenne.o || true
+	./test/test_mersenne_cov || true
+	mkdir -p $(COVERAGE_DIR)
+	gcov -o . mersenne.cpp > $(COVERAGE_DIR)/mersenne.gcov || true
+	@echo "Coverage artifacts in $(COVERAGE_DIR)"
+
+
+# Integration: run blossom headless briefly and verify it starts
+test-integration:
+	chmod +x test/run_integration.sh
+	./test/run_integration.sh
+
