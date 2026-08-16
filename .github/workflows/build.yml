@@ -1,0 +1,122 @@
+# Species-Blossom CI
+# Builds the evolver, runs a headless smoke test, exercises test/coverage
+# targets from the Makefile, and uploads coverage artifacts.
+#
+# Badge: [![build](https://github.com/bescritt/species-blossom/actions/workflows/build.yml/badge.svg)]
+#
+# Dependencies (ubuntu-latest provides gcc/g++ by default):
+#   gnuplot — required at link time by ui_gnuplot.o and at runtime if
+#             NO_PLOT is not set. Install it explicitly for CI parity.
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y gnuplot
+
+      - name: Clean any previous build artifacts
+        run: make clean
+
+      - name: Build (gcc/g++ — no configure step required)
+        run: make
+        # The Makefile compiles C files to .o and C++ files to .opp, then links
+        # blossom. Exhaust sources live under exhaust-1.9.2/.
+
+      - name: Verify binary produced
+        run: |
+          test -x ./blossom
+          ./blossom --help
+
+      - name: Headless smoke run (NO_PLOT=1, bounded by timeout)
+        run: |
+          # A full evolution run is an open-ended loop (while(true)).
+          # Bound it with timeout and a small round/cycle count so CI never
+          # hangs. NO_PLOT=1 suppresses the gnuplot pipe.
+          timeout 60 ./blossom --rounds 5 --cycles 10000
+        env:
+          NO_PLOT: 1
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y gnuplot
+
+      - name: Clean and build
+        run: make clean && make
+
+      - name: Run unit tests (Makefile `test` target)
+        run: make test
+        env:
+          NO_PLOT: 1
+
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y gnuplot
+
+      - name: Clean and build with coverage instrumentation
+        run: make clean && make coverage
+        env:
+          NO_PLOT: 1
+
+      - name: Run the instrumented binary (short smoke)
+        run: |
+          timeout 60 ./blossom --rounds 5 --cycles 10000
+        env:
+          NO_PLOT: 1
+
+      - name: Render coverage data with gcov
+        run: |
+          # Object files already carry .gcda/.gcno from the coverage build.
+          # Run gcov over every .o/.opp to produce .gcov text reports.
+          find . -name "*.gcda" -o -name "*.gcno" | head -1
+          gcov -b -c -l -p \
+            exhaust-1.9.2/pspace.o \
+            exhaust-1.9.2/sim.o \
+            exhaust-1.9.2/asm.o \
+            ui_gnuplot.o \
+            warrior.opp blossom_utils.opp world.opp benchmark.opp \
+            reproduction.opp insn_markov.opp rand.opp mersenne.opp \
+            exhaust.opp battle.opp population.opp blossom.opp \
+            2>&1 | tail -20
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-gcov
+          path: |
+            *.gcov
+            *.gcda
+            *.gcno
+          retention-days: 30
